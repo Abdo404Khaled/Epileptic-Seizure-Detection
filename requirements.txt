@@ -1,0 +1,7 @@
+ipfshttpclient
+opencv-python
+pandas
+numpy
+keras
+matplotlib
+tensorflow

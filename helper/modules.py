@@ -17,9 +17,15 @@ class EpilepticSeizure():
         self.base_folder = self.config['data_path']
         self.X = None
         self.y = None
+        self.X_train = None
+        self.y_train = None
+        self.X_test = None
+        self.y_test = None
     
     def process(self):
         self.__read_data()
+
+        self.__split_data()
 
         if self.config.get("preprocess", True):
             self.__preprocess()
@@ -27,9 +33,10 @@ class EpilepticSeizure():
         self.__augment_data()
 
         if self.config.get("generate_images", True):
-            self.__generate_images()
+            self.__generate_images(self.X_train, "Train")
+            self.__generate_images(self.X_test, "Test")
 
-        return self.X, self.y
+        return self.X_train, self.y_train, self.X_test, self.y_test
 
     def __read_data(self):
         data = []
@@ -56,19 +63,32 @@ class EpilepticSeizure():
         column_names = [f'Channel_{i+1}' for i in range(178)] + ['Label']
         data = pd.DataFrame(data, columns=column_names)
 
+        num_people = len(data) // self.config.get("rows_per_person", 23)
+
+        grouped_records = [data.iloc[i*self.config.get("rows_per_person", 23):(i+1)*self.config.get("rows_per_person", 23)] for i in range(num_people)]
+        np.random.shuffle(grouped_records)
+
+        data = pd.concat(grouped_records, ignore_index=True)
+
         self.X = data.iloc[:,:-1]
         self.y = data.iloc[:,-1:]
     
+    def __split_data(self):
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=self.config.get("test_size", 0.2), shuffle=False)
+    
     def __preprocess(self):
         if self.config.get('labels', 5) == 2:
-            self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 1})
+            label_map = {'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 1}
         elif self.config.get('labels', 5) == 3:
-            self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 0, 'C': 1, 'D': 1, 'E': 2})
+            label_map = {'A': 0, 'B': 0, 'C': 1, 'D': 1, 'E': 2}
         else:
-             self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4})
+            label_map = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4}
+
+        self.y_train['Label'] = self.y_train['Label'].map(label_map)
+        self.y_test['Label'] = self.y_test['Label'].map(label_map)
     
-    def __generate_images(self):
-        output_folder = os.path.join(self.base_folder, "Patient_images")
+    def __generate_images(self, X, mode):
+        output_folder = os.path.join(self.base_folder, f"Patient_images_{mode}")
 
         if os.path.exists(output_folder):
             shutil.rmtree(output_folder)
@@ -77,20 +97,20 @@ class EpilepticSeizure():
 
         image_paths = []
 
-        for person_id in tqdm(range(0, len(self.X), self.config.get("rows_per_person", 23)), desc="Processing Patients"):
-            person_data = self.X.iloc[person_id:person_id + self.config.get("rows_per_person", 23), :178].values.flatten()
+        for person_id in tqdm(range(0, len(X), self.config.get("rows_per_person", 23)), desc=f"Processing Patients {mode}"):
+            person_data = X.iloc[person_id:person_id + self.config.get("rows_per_person", 23), :178].values.flatten()
             image_path = self.__compute_stft_and_save(person_data, person_id, output_folder)
 
             image_paths.extend([image_path] * self.config.get("rows_per_person", 23))
         
-        self.X['Image_Path'] = pd.Series(image_paths, index=self.X.index)
+        X['Image_Path'] = pd.Series(image_paths, index=X.index)
 
     def __augment_data(self):
-        X_list = [self.X]
-        y_list = [self.y]
+        X_list = [self.X_train]
+        y_list = [self.y_train]
 
-        x_columns = self.X.columns
-        y_columns = self.y.columns
+        x_columns = self.X_train.columns
+        y_columns = self.y_train.columns
 
         if self.config.get('add_noise', False):
             X_augmented_noise, y_augmented_noise = self.__add_noise()
@@ -107,19 +127,19 @@ class EpilepticSeizure():
             X_list.append(X_over_resampled)
             y_list.append(y_over_resampled)
 
-        self.X = np.vstack(X_list)
-        self.y = np.concatenate(y_list)
+        self.X_train = np.vstack(X_list)
+        self.y_train = np.concatenate(y_list)
 
-        self.X = pd.DataFrame(self.X, columns=x_columns)
-        self.y = pd.DataFrame(self.y, columns=y_columns)
+        self.X_train = pd.DataFrame(self.X_train, columns=x_columns)
+        self.y_train = pd.DataFrame(self.y_train, columns=y_columns)
 
     
     def __add_noise(self):
         augmented_data = []
 
-        for idx, row in self.X.iterrows():
+        for idx, row in self.X_train.iterrows():
             data = row.values
-            label = self.y.iloc[idx]
+            label = self.y_train.iloc[idx]
 
             noise_level = np.random.uniform(0, 0.1)
             noisy_data = data + noise_level * np.random.normal(size=len(data))
@@ -137,7 +157,7 @@ class EpilepticSeizure():
 
         np.random.shuffle(augmented_data)
 
-        X_augmented_noise = pd.DataFrame(augmented_data[:, :-1], columns=self.X.columns)
+        X_augmented_noise = pd.DataFrame(augmented_data[:, :-1], columns=self.X_train.columns)
         y_augmented_noise = pd.DataFrame(augmented_data[:, -1], columns=['Label'])
     
         return X_augmented_noise, y_augmented_noise
@@ -156,10 +176,10 @@ class EpilepticSeizure():
         return image_path
         
     def __over_sampling(self):
-        return RandomOverSampler(random_state=42).fit_resample(self.X, self.y)
+        return RandomOverSampler(random_state=42).fit_resample(self.X_train, self.y_train)
 
     def __under_sampling(self):
-        return RandomUnderSampler(random_state=42).fit_resample(self.X, self.y)
+        return RandomUnderSampler(random_state=42).fit_resample(self.X_train, self.y_train)
 
 #####################################################################################################################
 #TODO: Modify for this dataset

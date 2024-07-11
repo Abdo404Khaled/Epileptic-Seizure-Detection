@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from scipy.signal import resample
 from scipy.interpolate import interp1d
 from imblearn.over_sampling import RandomOverSampler
@@ -9,24 +11,56 @@ from imblearn.under_sampling import RandomUnderSampler
 class EpilepticSeizure():
     def __init__(self, config):
         self.config = config
+        self.base_folder = self.config['data_path']
         self.X = None
         self.y = None
     
     def process(self):
         self.__read_data()
+
+        if self.config.get("preprocess", True):
+            self.__preprocess()
+
         self.__augment_data()
 
         return self.X, self.y
 
     def __read_data(self):
-        data = pd.read_csv(self.config['data_path'])
+        data = []
+        
+        for folder in sorted(os.listdir(self.base_folder)):
+            if '.' in folder:
+                continue
+                
+            folder_path = os.path.join(self.base_folder, folder)
+            
+            for filename in tqdm(sorted(os.listdir(folder_path)), desc=f"Processing files in {folder}"):
+                file_path = os.path.join(folder_path, filename)
+                
+                with open(file_path, 'r') as file:
+                    lines = file.readlines()
+                    
+                    for i in range(23):
+                        start = i * 178
+                        end = start + 178
+                        eeg_readings = [float(value.strip()) for value in lines[start:end]]
+                        
+                        data.append(eeg_readings + [folder])
+        
+        column_names = [f'Channel_{i+1}' for i in range(178)] + ['Label']
+        data = pd.DataFrame(data, columns=column_names)
 
         self.X = data.iloc[:,1:-1]
         self.y = data.iloc[:,-1:]
-
-        self.y = self.y['y'].apply(lambda x: 1 if x == 1 else 0)
-        self.y = pd.DataFrame(data=self.y)
     
+    def __preprocess(self):
+        if self.config.get('labels', 5) == 2:
+            self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 1})
+        elif self.config.get('labels', 5) == 3:
+            self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 0, 'C': 1, 'D': 1, 'E': 2})
+        else:
+             self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4})
+
     def __augment_data(self):
         X_list = [self.X]
         y_list = [self.y]
@@ -39,15 +73,15 @@ class EpilepticSeizure():
             X_list.append(X_augmented_noise)
             y_list.append(y_augmented_noise)
 
-        if self.config.get('oversampling', False):
-            X_over_resampled, y_over_resampled = self.__over_sampling()
-            X_list.append(X_over_resampled)
-            y_list.append(y_over_resampled)
-
         if self.config.get('undersampling', False):
             X_under_resampled, y_under_resampled = self.__under_sampling()
             X_list.append(X_under_resampled)
             y_list.append(y_under_resampled)
+        
+        if self.config.get('oversampling', False):
+            X_over_resampled, y_over_resampled = self.__over_sampling()
+            X_list.append(X_over_resampled)
+            y_list.append(y_over_resampled)
 
         self.X = np.vstack(X_list)
         self.y = np.concatenate(y_list)
@@ -80,7 +114,7 @@ class EpilepticSeizure():
         np.random.shuffle(augmented_data)
 
         X_augmented_noise = pd.DataFrame(augmented_data[:, :-1], columns=self.X.columns)
-        y_augmented_noise = pd.DataFrame(augmented_data[:, -1], columns=['y'])
+        y_augmented_noise = pd.DataFrame(augmented_data[:, -1], columns=['Label'])
     
         return X_augmented_noise, y_augmented_noise
         
@@ -92,6 +126,7 @@ class EpilepticSeizure():
 
 #####################################################################################################################
 #TODO: Modify for this dataset
+
 class LeaveOneOut():
     def __init__(self, dataset, model, subsets_no, prediction_label):
         self.dataset = data

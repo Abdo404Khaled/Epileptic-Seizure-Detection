@@ -50,7 +50,7 @@ class EpilepticSeizure():
         column_names = [f'Channel_{i+1}' for i in range(178)] + ['Label']
         data = pd.DataFrame(data, columns=column_names)
 
-        self.X = data.iloc[:,1:-1]
+        self.X = data.iloc[:,:-1]
         self.y = data.iloc[:,-1:]
     
     def __preprocess(self):

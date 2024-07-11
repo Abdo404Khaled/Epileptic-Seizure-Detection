@@ -1,8 +1,11 @@
 import os
+import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 from scipy.signal import resample
+from scipy.signal import spectrogram
 from scipy.interpolate import interp1d
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection import train_test_split
@@ -23,13 +26,16 @@ class EpilepticSeizure():
 
         self.__augment_data()
 
+        if self.config.get("generate_images", True):
+            self.__generate_images()
+
         return self.X, self.y
 
     def __read_data(self):
         data = []
         
         for folder in sorted(os.listdir(self.base_folder)):
-            if '.' in folder:
+            if '.' in folder or len(folder) > 1:
                 continue
                 
             folder_path = os.path.join(self.base_folder, folder)
@@ -60,6 +66,24 @@ class EpilepticSeizure():
             self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 0, 'C': 1, 'D': 1, 'E': 2})
         else:
              self.y['Label'] = self.y['Label'].map({'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4})
+    
+    def __generate_images(self):
+        output_folder = os.path.join(self.base_folder, "Patient_images")
+
+        if os.path.exists(output_folder):
+            shutil.rmtree(output_folder)
+            
+        os.makedirs(output_folder, exist_ok=True)
+
+        image_paths = []
+
+        for person_id in tqdm(range(0, len(self.X), self.config.get("rows_per_person", 23)), desc="Processing Patients"):
+            person_data = self.X.iloc[person_id:person_id + self.config.get("rows_per_person", 23), :178].values.flatten()
+            image_path = self.__compute_stft_and_save(person_data, person_id, output_folder)
+
+            image_paths.extend([image_path] * self.config.get("rows_per_person", 23))
+        
+        self.X['Image_Path'] = pd.Series(image_paths, index=self.X.index)
 
     def __augment_data(self):
         X_list = [self.X]
@@ -117,6 +141,19 @@ class EpilepticSeizure():
         y_augmented_noise = pd.DataFrame(augmented_data[:, -1], columns=['Label'])
     
         return X_augmented_noise, y_augmented_noise
+    
+    def __compute_stft_and_save(self, person_data, person_id, output_folder):
+        f, t, Sxx = spectrogram(person_data, self.config.get('frequency', 178))
+
+        plt.figure(figsize=(8, 4))
+        plt.pcolormesh(t, f, np.log(Sxx + 1e-10), cmap='viridis')
+        plt.axis('off')  
+
+        image_path = os.path.join(output_folder, f'person_{person_id // self.config.get("rows_per_person", 23) + 1}_spectrogram.png')
+        plt.savefig(image_path, bbox_inches='tight', pad_inches=0)
+        plt.close()
+
+        return image_path
         
     def __over_sampling(self):
         return RandomOverSampler(random_state=42).fit_resample(self.X, self.y)

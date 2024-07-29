@@ -2,5 +2,5 @@
 Data/.DS_Store/
 Data/Patient_images_Test/
 Data/Patient_images_Train/
-helper/__pycache__/__init__.cpython-39.pyc
-helper/__pycache__/modules.cpython-39.pyc
+helper/__pycache__/
+/__pycache__/

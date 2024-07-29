@@ -1,0 +1,23 @@
+labels: 5
+add_noise: True
+oversampling: True
+undersampling: True
+train_accuracy: 89.13
+test_accuracy: 85.42
+train_loss: 0.3383638262748718
+test_loss: 0.5498296022415161
+classification_report:
+              precision    recall  f1-score   support
+
+           0       0.96      0.84      0.90       759
+           1       0.79      0.97      0.87       598
+           2       0.74      0.85      0.79       598
+           3       0.82      0.75      0.79       828
+           4       0.99      0.89      0.94       667
+
+    accuracy                           0.85      3450
+   macro avg       0.86      0.86      0.86      3450
+weighted avg       0.86      0.85      0.86      3450
+
+confusion_matrix:
+[[639, 120, 0, 0, 0], [0, 580, 0, 18, 0], [6, 0, 511, 81, 0], [11, 13, 175, 621, 8], [12, 23, 2, 34, 596]]

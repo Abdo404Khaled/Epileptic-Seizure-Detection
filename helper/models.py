@@ -1,4 +1,9 @@
-def MultiModal_Model(learning_rate=0.0001, dropout_rate_cnn=0.5, dropout_rate_lstm=0.2):
+from tensorflow.keras import regularizers # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.models import Model, Sequential # type: ignore
+from tensorflow.keras.layers import MaxPooling2D, Input, LSTM, Dense, Conv2D, GlobalAveragePooling2D, BatchNormalization, Dropout, Concatenate # type: ignore
+
+def MultiModal_Model(learning_rate=0.0001, dropout_rate_cnn=0.5, dropout_rate_lstm=0.2, labels=3):
     CNN_model = Sequential()
     
     CNN_model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(64, 64, 3), padding='same'))
@@ -31,12 +36,10 @@ def MultiModal_Model(learning_rate=0.0001, dropout_rate_cnn=0.5, dropout_rate_ls
     x = Dense(128, activation='relu')(combined_output)
     x = Dense(64, activation='relu')(x)
     x = Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
-    final_output = Dense(3, activation='softmax')(x)
+    final_output = Dense(labels, activation='softmax')(x)
 
-    # Define the model
     model = Model(inputs=[eeg_input, image_input], outputs=final_output)
 
-    # Compile the model
     model.compile(optimizer=Adam(learning_rate=learning_rate),
                   loss='categorical_crossentropy',
                   metrics=['accuracy'])

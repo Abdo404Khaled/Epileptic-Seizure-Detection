@@ -45,3 +45,50 @@ def MultiModal_Model(learning_rate=0.0001, dropout_rate_cnn=0.5, dropout_rate_ls
                   metrics=['accuracy'])
     
     return model
+
+
+def CNN_Model(learning_rate=0.0001, dropout_rate_cnn=0.5,labels=3):
+    cnn_model = Sequential()
+    
+    cnn_model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(64, 64, 3), padding='same'))
+    cnn_model.add(MaxPooling2D(pool_size=(2, 2)))
+    cnn_model.add(BatchNormalization())
+    
+    cnn_model.add(Conv2D(128, kernel_size=(3, 3), activation='relu', padding='same'))
+    cnn_model.add(MaxPooling2D(pool_size=(2, 2)))
+    cnn_model.add(BatchNormalization())
+    
+    cnn_model.add(GlobalAveragePooling2D())
+    cnn_model.add(Dropout(dropout_rate_cnn))
+
+
+    cnn_model.add(Dense(128, activation='relu'))
+    cnn_model.add(Dense(64, activation='relu'))
+    cnn_model.add(Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
+    cnn_model.add(Dense(labels, activation='softmax'))
+
+    cnn_model.compile(optimizer=Adam(learning_rate=learning_rate),
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+    
+    return cnn_model
+
+def LSTM_Model(learning_rate=0.0001, dropout_rate_lstm=0.2, labels=3):
+    lstm_model = Sequential()
+    
+    lstm_model.add(LSTM(256, activation='relu', return_sequences=True, input_shape=(1, 178)))
+    lstm_model.add(BatchNormalization())
+    lstm_model.add(LSTM(128, activation='relu'))
+    lstm_model.add(BatchNormalization())
+    lstm_model.add(Dropout(dropout_rate_lstm))
+
+    lstm_model.add(Dense(128, activation='relu'))
+    lstm_model.add(Dense(64, activation='relu'))
+    lstm_model.add(Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
+    lstm_model.add(Dense(labels, activation='softmax'))
+
+    lstm_model.compile(optimizer=Adam(learning_rate=learning_rate),
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+    
+    return lstm_model

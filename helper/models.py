@@ -47,7 +47,7 @@ def MultiModal_Model(learning_rate=0.0001, dropout_rate_cnn=0.5, dropout_rate_ls
     return model
 
 
-def CNN_Model(learning_rate=0.0001, dropout_rate_cnn=0.5,labels=3):
+def CNN_Model(learning_rate=0.0001,labels=3):
     cnn_model = Sequential()
     
     cnn_model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(64, 64, 3), padding='same'))
@@ -59,8 +59,7 @@ def CNN_Model(learning_rate=0.0001, dropout_rate_cnn=0.5,labels=3):
     cnn_model.add(BatchNormalization())
     
     cnn_model.add(GlobalAveragePooling2D())
-    cnn_model.add(Dropout(dropout_rate_cnn))
-
+    
 
     cnn_model.add(Dense(128, activation='relu'))
     cnn_model.add(Dense(64, activation='relu'))
